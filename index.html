@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Колесо Улучшений</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; min-height: 100dvh;
+      background: #0b0b0c; display: flex; flex-direction: column;
+      justify-content: flex-start; align-items: center; gap: 12px;
+      padding: 14px 12px 40px; user-select: none; -webkit-user-select: none;
+      font-family: system-ui, Arial, sans-serif; overflow-x: hidden;
+      touch-action: manipulation; color: #fff;
+    }
+    .balance {
+      display: flex; align-items: center; gap: 6px;
+      background: #17171a; border: 1px solid #2a2a2d; border-radius: 999px;
+      padding: 8px 16px 8px 14px; font-weight: 900; font-size: 16px;
+      color: #ffc814; box-shadow: 0 0 20px rgba(255,200,20,.08);
+      position: relative;
+    }
+    .balance img { width: 18px; height: 18px; display: block; }
+    .reset-btn {
+      position: absolute; right: -34px; top: 50%; transform: translateY(-50%);
+      width: 28px; height: 28px; border: 1px solid #2a2a2d;
+      border-radius: 50%; background: #17171a; color: #666;
+      font-size: 14px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .reset-btn:active { background: #f03e24; color: #fff; }
+    .upgrade { position: relative; width: min(300px, 78vw); aspect-ratio: 1/1; flex: 0 0 auto; }
+    .wheel-bg, .wheel-black { position: absolute; inset: 0; background-repeat: no-repeat; background-position: center; background-size: contain; pointer-events: none; }
+    .wheel-bg { background-image: url("https://s3.upgrader.vip/cdn/fa/images/game/upgrade-circle-bg.svg"); transform: scale(1.05); z-index: 1; }
+    .wheel-black { background-image: url("https://s3.upgrader.vip/cdn/fa/images/game/circle-black.svg"); transform: scale(0.92); z-index: 2; }
+    .wheel-svg { position: absolute; inset: 3.7%; z-index: 3; }
+    .wheel-svg svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .pointer { position: absolute; inset: 0; z-index: 10; pointer-events: none; display: flex; justify-content: center; align-items: flex-start; transform-origin: 50% 50%; will-change: transform; }
+    .pointer img { width: 13.5%; height: auto; margin-top: -1%; object-fit: contain; display: block; }
+
+    .center {
+      position: absolute; z-index: 5; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 58%; aspect-ratio: 1/1;
+      border: 0; border-radius: 50%;
+      background: #1a1a1c; box-shadow: 0 0 20px #1a1a1c;
+      cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: transform .2s, background .2s, opacity .2s;
+      -webkit-tap-highlight-color: transparent;
+      font-family: inherit;
+    }
+    .center:active:not(:disabled) { transform: translate(-50%, -50%) scale(.97); background: #222225; }
+    .center:disabled { cursor: not-allowed; opacity: .85; }
+    .center .perc {
+      font-size: clamp(26px, 8vw, 44px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -1px;
+      transition: color .2s;
+    }
+    .center .level {
+      margin-top: 4px;
+      font-size: clamp(9px, 2.4vw, 12px);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      opacity: .85;
+      text-align: center;
+      line-height: 1.1;
+      padding: 0 8px;
+    }
+    .center.low  .perc { color: #f03e24; }
+    .center.low  .level { color: #f03e24; }
+    .center.mid  .perc { color: #ffc814; }
+    .center.mid  .level { color: #ffc814; }
+    .center.high .perc { color: #2cd613; }
+    .center.high .level { color: #2cd613; }
+    .center.idle .perc { color: #555; }
+    .center.idle .level { color: #555; }
+
+    .panel { text-align: center; }
+    .result { margin-top: 6px; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; min-height: 18px; }
+    .result.success { color: #2cd613; text-shadow: 0 0 10px rgba(44,214,19,.5); }
+    .result.fail { color: #f03e24; text-shadow: 0 0 10px rgba(240,62,36,.5); }
+    .result.process { color: #aaa; }
+    .result.deposit { color: #4db2ff; text-shadow: 0 0 10px rgba(77,178,255,.4); }
+
+    .zones { width: min(348px, 92vw); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .zone { background: #121214; border: 1px solid #2a2a2d; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 190px; }
+    .zone-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: #666; }
+    .zone-label.mine { color: #ffc814; }
+    .zone-label.want { color: #4db2ff; }
+    .zone-slot { width: 120px; height: 140px; border-radius: 12px; border: 2px dashed #2c2c2f; background: #1a1a1c; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; transition: border-color .2s, box-shadow .2s, background .2s; }
+    .zone-slot.filled { border-style: solid; border-color: rgba(var(--rarity), .8); background: linear-gradient(137deg, rgba(var(--rarity), .35) 10%, #1c1c20 75%); box-shadow: 0 0 12px rgba(var(--rarity), .35); }
+    .zone-slot .inner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: url("https://s3.upgrader.vip/cdn/fa/images/light-gray-logo.png") center/55% no-repeat; }
+    .zone-slot .glow { position: absolute; inset: 0; background: radial-gradient(circle, rgba(var(--rarity), .4) 0%, rgba(var(--rarity), .2) 30%, transparent 70%); pointer-events: none; }
+    .zone-slot .item-img { position: relative; z-index: 1; max-width: 88%; max-height: 70%; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,.6)); }
+    .zone-slot .name-block { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); z-index: 2; width: 94%; text-align: center; line-height: 1.1; }
+    .zone-slot .type { font-size: 8px; color: #999; font-weight: 600; display: block; text-transform: uppercase; }
+    .zone-slot .name { font-size: 9px; color: #fff; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+    .zone-slot .price { position: absolute; top: 3px; right: 3px; z-index: 3; display: flex; align-items: center; gap: 3px; background: rgba(0,0,0,.6); border-radius: 5px; padding: 2px 5px; font-size: 9px; font-weight: 800; color: #ffdd24; }
+    .zone-slot .price img { width: 8px; height: 8px; }
+    .zone-slot .remove { position: absolute; top: 3px; left: 3px; z-index: 3; width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+    .zone-slot .remove:active { background: #f03e24; }
+    .zone-hint { font-size: 11px; color: #555; text-align: center; }
+    .actions { display: flex; gap: 8px; width: min(348px, 92vw); }
+    .btn { flex: 1; padding: 14px 8px; border: 0; border-radius: 10px; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; transition: transform .15s, opacity .2s, background .2s; -webkit-tap-highlight-color: transparent; font-family: inherit; color: #fff; background: #2a2a2d; }
+    .btn:active:not(:disabled) { transform: scale(.98); background: #3a3a3f; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .shop { width: min(348px, 92vw); max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+    .shop.open { max-height: 10000px; overflow: visible; }
+    .shop-inner { background: #121214; border: 1px solid #2a2a2d; border-radius: 14px; padding: 12px; }
+    .shop-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; text-align: center; }
+    .shop-mode { display: flex; gap: 6px; margin-bottom: 8px; }
+    .shop-mode button { flex: 1; padding: 8px; border: 1px solid #2a2a2d; border-radius: 8px; background: #1c1c1f; color: #888; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+    .shop-mode button.active { background: #ffc814; border-color: #ffc814; color: #111; }
+    .shop-filter { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; }
+    .shop-filter button { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #2a2a2d; border-radius: 6px; background: #1c1c1f; color: #888; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+    .shop-filter button.active { background: #2a2a2d; border-color: #ffc814; color: #ffc814; }
+    .shop-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+    .shop-pagination button { padding: 8px 14px; border: 1px solid #2a2a2d; border-radius: 8px; background: #1c1c1f; color: #fff; font-weight: 800; font-size: 12px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+    .shop-pagination button:disabled { opacity: .3; cursor: not-allowed; }
+    .shop-pagination button:active:not(:disabled) { background: #2a2a2d; }
+    .shop-page-info { color: #888; font-size: 12px; font-weight: 700; }
+    .shop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .item-card { position: relative; border-radius: 8px; padding: 1px; background: linear-gradient(137deg, rgb(var(--rarity)) 10%, #1c1c20 75%); box-shadow: 0 0 3px 0 rgba(255,255,255,.10); cursor: pointer; transition: transform .15s, box-shadow .15s; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+    .item-card:active:not(.disabled) { transform: scale(.96); }
+    .item-card.disabled { opacity: .3; cursor: not-allowed; }
+    .item-card .item-inner { position: relative; border-radius: 7px; background: #1c1c20 url("https://s3.upgrader.vip/cdn/fa/images/light-gray-logo.png") center/55% no-repeat; display: flex; align-items: center; justify-content: center; aspect-ratio: 1/1.12; overflow: hidden; }
+    .item-card .glow { position: absolute; inset: 0; background: radial-gradient(circle, rgba(var(--rarity), .40) 0%, rgba(var(--rarity), .20) 30%, rgba(var(--rarity), .10) 45%, transparent 70%); pointer-events: none; transition: transform .4s, filter .4s; }
+    .item-card:active:not(.disabled) .glow { transform: scale(1.15); filter: brightness(1.4); }
+    .item-card .item-img { position: relative; z-index: 1; max-width: 82%; max-height: 65%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+    .item-card .corner-price { position: absolute; top: 4px; right: 4px; z-index: 2; display: flex; align-items: center; gap: 3px; background: rgba(0,0,0,.55); border-radius: 5px; padding: 2px 5px; font-size: 9px; font-weight: 800; color: #ffdd24; }
+    .item-card .corner-price img { width: 8px; height: 8px; }
+    .item-card .name-block { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); z-index: 2; width: 92%; text-align: center; line-height: 1.1; }
+    .item-card .type { font-size: 8px; color: #999; font-weight: 600; display: block; text-transform: uppercase; }
+    .item-card .name { font-size: 9px; color: #fff; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+    .inv { width: min(348px, 92vw); background: #121214; border: 1px solid #2a2a2d; border-radius: 14px; padding: 12px; }
+    .inv-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .inv-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .inv-sellall { padding: 6px 10px; border: 0; border-radius: 7px; background: #2cd613; color: #0b0b0c; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; transition: transform .15s, opacity .2s; }
+    .inv-sellall:active:not(:disabled) { transform: scale(.97); }
+    .inv-sellall:disabled { opacity: .35; cursor: not-allowed; }
+    .inv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; min-height: 100px; }
+    .inv-empty { grid-column: 1 / -1; text-align: center; color: #555; font-size: 12px; padding: 30px 0; }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+    .modal.open { display: flex; }
+    .modal-box { background: #17171a; border: 1px solid #2a2a2d; border-radius: 16px; padding: 20px; width: min(320px, 90vw); text-align: center; }
+    .modal-preview { width: 150px; height: 150px; margin: 0 auto 12px; border-radius: 12px; background: #1c1c20 url("https://s3.upgrader.vip/cdn/fa/images/light-gray-logo.png") center/55% no-repeat; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .modal-preview .glow { position: absolute; inset: 0; background: radial-gradient(circle, rgba(var(--rarity), .4) 0%, rgba(var(--rarity), .2) 30%, transparent 70%); }
+    .modal-preview img { position: relative; z-index: 1; max-width: 85%; max-height: 70%; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,.6)); }
+    .modal-name { font-size: 12px; color: #ccc; font-weight: 700; margin-bottom: 4px; }
+    .modal-name b { color: #fff; }
+    .modal-price { display: flex; align-items: center; justify-content: center; gap: 5px; color: #ffc814; font-weight: 800; font-size: 16px; margin-bottom: 4px; }
+    .modal-price img { width: 15px; height: 15px; }
+    .modal-fee { font-size: 11px; color: #666; margin-bottom: 16px; }
+    .modal-fee b { color: #2cd613; }
+    .modal-actions { display: flex; flex-direction: column; gap: 8px; }
+    .modal-actions button { padding: 14px; border: 0; border-radius: 10px; font-weight: 900; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; transition: transform .15s, opacity .2s; }
+    .modal-actions button:active:not(:disabled) { transform: scale(.98); }
+    .modal-actions button:disabled { opacity: .4; cursor: not-allowed; }
+    .modal-use { background: #ffc814; color: #111; }
+    .modal-sell { background: #2cd613; color: #111; }
+    .modal-cancel { background: #2a2a2d; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <div class="balance">
+    <img src="https://s3.upgrader.vip/cdn/fa/icons/coins.svg" alt="">
+    <span id="balance">250</span>
+    <button class="reset-btn" id="resetBtn" type="button" title="Сбросить прогресс">⟳</button>
+  </div>
+
+  <div class="upgrade">
+    <div class="pointer" id="pointer"><img src="https://s3.upgrader.vip/cdn/fa/images/game/pointer.png" alt=""></div>
+    <div class="wheel-bg"></div>
+    <div class="wheel-black"></div>
+    <div class="wheel-svg">
+      <svg viewBox="0 0 191 191">
+        <defs>
+          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#23d70c" />
+            <stop offset="60%" stop-color="#ebd215" />
+            <stop offset="80%" stop-color="#edb516" />
+            <stop offset="100%" stop-color="#df4125" />
+          </linearGradient>
+        </defs>
+        <circle cx="95.5" cy="95.5" r="81" fill="none" stroke="#202021" stroke-width="29" />
+        <circle id="sector" cx="95.5" cy="95.5" r="81" fill="none" stroke="url(#progressGradient)" stroke-width="29" stroke-linecap="butt" stroke-dasharray="0 508.938" stroke-dashoffset="0" />
+      </svg>
+    </div>
+    <button class="center idle" id="spin" type="button">
+      <div class="perc" id="perc">??%</div>
+      <div class="level" id="level">заполни слоты</div>
+    </button>
+  </div>
+
+  <div class="panel">
+    <div class="result" id="result">Купи предмет и выбери желаемый</div>
+  </div>
+
+  <div class="zones">
+    <div class="zone">
+      <div class="zone-label mine">Твой предмет</div>
+      <div class="zone-slot" id="mySlot"></div>
+      <div class="zone-hint" id="myHint">Купи или из инвентаря</div>
+    </div>
+    <div class="zone">
+      <div class="zone-label want">Желаемый</div>
+      <div class="zone-slot" id="wantSlot"></div>
+      <div class="zone-hint" id="wantHint">Выбери цель</div>
+    </div>
+  </div>
+
+  <div class="actions"><button class="btn" id="shopBtn" type="button">📦 Магазин</button></div>
+
+  <div class="shop" id="shop">
+    <div class="shop-inner">
+      <div class="shop-title">Магазин</div>
+      <div class="shop-mode">
+        <button id="modeBuy" class="active" type="button">Купить (твой)</button>
+        <button id="modeWant" type="button">Выбрать (желаемый)</button>
+      </div>
+      <div class="shop-filter" id="shopFilter">
+        <button data-filter="all" class="active" type="button">Все</button>
+        <button data-filter="cheap" type="button">Дешёвые</button>
+        <button data-filter="mid" type="button">Средние</button>
+        <button data-filter="expensive" type="button">Дорогие</button>
+      </div>
+      <div class="shop-grid" id="shopGrid"></div>
+      <div class="shop-pagination">
+        <button id="prevPage" type="button">‹</button>
+        <span class="shop-page-info" id="pageInfo">1 / 1</span>
+        <button id="nextPage" type="button">›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="inv">
+    <div class="inv-head">
+      <div class="inv-title">Инвентарь</div>
+      <button class="inv-sellall" id="sellAllBtn" type="button" disabled>Продать всё · 99.8%</button>
+    </div>
+    <div class="inv-grid" id="invGrid"></div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <div class="modal-preview" id="modalPreview"><div class="glow"></div><img id="modalImg" src="" alt=""></div>
+      <div class="modal-name" id="modalName"></div>
+      <div class="modal-price"><img src="https://s3.upgrader.vip/cdn/fa/icons/coins.svg" alt=""><span id="modalPrice">100</span></div>
+      <div class="modal-fee">Продажа: <b id="modalPayout">99.8</b> монет (комиссия 0.2%)</div>
+      <div class="modal-actions">
+        <button class="modal-use" id="modalUse" type="button">Поставить в слот</button>
+        <button class="modal-sell" id="modalSell" type="button">Продать</button>
+        <button class="modal-cancel" id="modalCancel" type="button">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="skins-data.js"></script>
+  <script>
+    /* ===== КОНСТАНТЫ ===== */
+    const SELL_RATE = 0.998;
+    const PAGE_SIZE = 9;
+    const STORAGE_KEY = 'upgrader_save_v8';
+    const START_BALANCE = 250;
+    const MAX_CHANCE = 99;
+    const SPIN_DURATION_MS = 6000;
+
+    /* ===== ЗВУК ТРЕЩОТКИ ===== */
+    let audioCtx = null;
+    function initAudio() {
+      if (audioCtx) return;
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    function tick(volume = 0.15) {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 1800 + Math.random() * 400;
+      gain.gain.setValueAtTime(volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.04);
+    }
+    function scheduleTicks(durationMs, onDone) {
+      const start = performance.now();
+      function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+      let nextTickAt = 0;
+      const baseInterval = 40;
+      function loop() {
+        const elapsed = performance.now() - start;
+        if (elapsed >= durationMs) { onDone && onDone(); return; }
+        if (elapsed >= nextTickAt) {
+          const t = elapsed / durationMs;
+          const vol = 0.18 * (1 - t * 0.5);
+          tick(vol);
+          const progress = easeOutQuart(t);
+          const interval = baseInterval + progress * progress * 350;
+          nextTickAt = elapsed + interval;
+        }
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    /* ===== БАЛАНС ===== */
+    const balanceEl = document.getElementById('balance');
+    let balance = START_BALANCE;
+    function setBalance(v) {
+      balance = Math.max(0, Math.round(v * 100) / 100);
+      balanceEl.textContent = balance.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+    }
+    function addBalance(v) { setBalance(balance + v); }
+
+    const RARITY_COLORS = {
+      common: '176, 195, 217',
+      rare:   '136, 71, 255',
+      legend: '255, 174, 57',
+      mythic: '235, 75, 75',
+      godly:  '211, 44, 230',
+    };
+
+    /* ===== МАГАЗИН (из skins-data.js) ===== */
+    const SHOP_ITEMS = window.SKINS || [];
+
+    /* ===== СОХРАНЕНИЕ ===== */
+    function saveState() {
+      try {
+        const data = {
+          balance: balance,
+          inventory: inventory.map(i => ({ type: i.type, name: i.name, rarity: i.rarity, price: i.price, img: i.img })),
+          myItem: myItem ? { type: myItem.type, name: myItem.name, rarity: myItem.rarity, price: myItem.price, img: myItem.img, paid: myItem.paid } : null,
+          wantItem: wantItem ? { type: wantItem.type, name: wantItem.name, rarity: wantItem.rarity, price: wantItem.price, img: wantItem.img } : null,
+          invIdSeq: invIdSeq,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {}
+    }
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (typeof data.balance === 'number') balance = data.balance;
+        if (Array.isArray(data.inventory)) inventory = data.inventory.map(i => ({ ...i, id: ++invIdSeq }));
+        if (data.invIdSeq) invIdSeq = data.invIdSeq;
+        myItem = data.myItem || null;
+        wantItem = data.wantItem || null;
+        return true;
+      } catch (e) { return false; }
+    }
+    function resetState() {
+      if (!confirm('Сбросить весь прогресс?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+
+    let myItem = null, wantItem = null;
+    let inventory = [];
+    let spinning = false, currentChance = 0, invIdSeq = 0;
+    let shopMode = 'buy', shopFilter = 'all', shopPage = 1;
+
+    const shopEl = document.getElementById('shop');
+    const shopGrid = document.getElementById('shopGrid');
+    const shopBtn = document.getElementById('shopBtn');
+    const shopFilterEl = document.getElementById('shopFilter');
+    const modeBuy = document.getElementById('modeBuy');
+    const modeWant = document.getElementById('modeWant');
+    const mySlot = document.getElementById('mySlot');
+    const wantSlot = document.getElementById('wantSlot');
+    const myHint = document.getElementById('myHint');
+    const wantHint = document.getElementById('wantHint');
+    const invGrid = document.getElementById('invGrid');
+    const sellAllBtn = document.getElementById('sellAllBtn');
+    const prevPageBtn = document.getElementById('prevPage');
+    const nextPageBtn = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
+    const percEl = document.getElementById('perc');
+    const levelEl = document.getElementById('level');
+
+    document.getElementById('resetBtn').addEventListener('click', resetState);
+
+    shopBtn.addEventListener('click', () => shopEl.classList.toggle('open'));
+    modeBuy.addEventListener('click', () => { shopMode='buy'; modeBuy.classList.add('active'); modeWant.classList.remove('active'); shopPage=1; renderShop(); });
+    modeWant.addEventListener('click', () => { shopMode='want'; modeWant.classList.add('active'); modeBuy.classList.remove('active'); shopPage=1; renderShop(); });
+    shopFilterEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-filter]');
+      if (!btn) return;
+      shopFilter = btn.dataset.filter;
+      shopFilterEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      shopPage = 1;
+      renderShop();
+    });
+    prevPageBtn.addEventListener('click', () => { if (shopPage > 1) { shopPage--; renderShop(); } });
+    nextPageBtn.addEventListener('click', () => {
+      const filtered = SHOP_ITEMS.filter(filterMatch);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      if (shopPage < totalPages) { shopPage++; renderShop(); }
+    });
+
+    function filterMatch(item) {
+      if (shopFilter === 'all') return true;
+      if (shopFilter === 'cheap') return item.price < 50;
+      if (shopFilter === 'mid') return item.price >= 50 && item.price < 5000;
+      if (shopFilter === 'expensive') return item.price >= 5000;
+      return true;
+    }
+
+    function fmtPrice(p) {
+      if (p >= 100) return Math.round(p).toLocaleString('ru-RU');
+      return p.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+    }
+
+    function buildItemCard(item, onClick, extraClass = '') {
+      const el = document.createElement('div');
+      el.className = 'item-card ' + extraClass;
+      el.style.setProperty('--rarity', RARITY_COLORS[item.rarity] || RARITY_COLORS.common);
+      el.innerHTML = `
+        <div class="item-inner">
+          <div class="glow"></div>
+          <img class="item-img" src="${item.img}" alt="" loading="lazy">
+          <div class="corner-price">
+            <img src="https://s3.upgrader.vip/cdn/fa/icons/coins.svg" alt="">
+            ${fmtPrice(item.price)}
+          </div>
+          <div class="name-block">
+            <span class="type">${item.type || ''}</span>
+            <span class="name">${item.name || ''}</span>
+          </div>
+        </div>
+      `;
+      el.addEventListener('click', onClick);
+      return el;
+    }
+
+    function renderShop() {
+      shopGrid.innerHTML = '';
+      const filtered = SHOP_ITEMS.filter(filterMatch);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      if (shopPage > totalPages) shopPage = totalPages;
+      const start = (shopPage - 1) * PAGE_SIZE;
+      const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+      pageItems.forEach(item => {
+        let disabled = false;
+        if (spinning) disabled = true;
+        if (shopMode === 'buy' && (balance < item.price || myItem)) disabled = true;
+        if (shopMode === 'want' && wantItem) disabled = true;
+
+        const card = buildItemCard(item, () => {
+          if (spinning) { setResult('Идёт апгрейд — подожди', 'fail'); return; }
+          if (shopMode === 'buy') {
+            if (myItem) { setResult('Слот "твой" уже занят', 'fail'); return; }
+            if (balance < item.price) { setResult('НЕ ХВАТАЕТ МОНЕТ', 'fail'); return; }
+            addBalance(-item.price);
+            myItem = { ...item, paid: item.price };
+            setResult(`Куплено: ${item.name}`, 'deposit');
+          } else {
+            if (wantItem) { setResult('Желаемый уже выбран', 'fail'); return; }
+            wantItem = { ...item };
+            setResult(`Цель: ${item.name}`, 'deposit');
+          }
+          renderZones(); renderShop(); saveState();
+        }, disabled ? 'disabled' : '');
+        shopGrid.appendChild(card);
+      });
+
+      pageInfo.textContent = `${shopPage} / ${totalPages}`;
+      prevPageBtn.disabled = shopPage <= 1;
+      nextPageBtn.disabled = shopPage >= totalPages;
+    }
+
+    function renderZones() {
+      renderSlot(mySlot, myItem, () => {
+        if (spinning) return;
+        if (myItem && myItem.paid) {
+          addBalance(myItem.paid);
+          setResult(`Возврат: +${fmtPrice(myItem.paid)}`, 'deposit');
+        }
+        myItem = null;
+        renderZones(); renderShop(); saveState();
+      });
+      renderSlot(wantSlot, wantItem, () => {
+        if (spinning) return;
+        wantItem = null;
+        renderZones(); renderShop(); saveState();
+      });
+      myHint.textContent = myItem ? '' : 'Купи или из инвентаря';
+      wantHint.textContent = wantItem ? '' : 'Выбери цель';
+      updateChancePreview();
+    }
+
+    function renderSlot(el, item, onRemove) {
+      el.innerHTML = '';
+      el.classList.toggle('filled', !!item);
+      el.style.removeProperty('--rarity');
+      if (!item) return;
+      el.style.setProperty('--rarity', RARITY_COLORS[item.rarity] || RARITY_COLORS.common);
+      const inner = document.createElement('div');
+      inner.className = 'inner';
+      inner.innerHTML = `
+        <div class="glow"></div>
+        <img class="item-img" src="${item.img}" alt="">
+        <div class="price"><img src="https://s3.upgrader.vip/cdn/fa/icons/coins.svg" alt="">${fmtPrice(item.price)}</div>
+        <div class="name-block">
+          <span class="type">${item.type || ''}</span>
+          <span class="name">${item.name || ''}</span>
+        </div>
+      `;
+      el.appendChild(inner);
+      if (!spinning) {
+        const remove = document.createElement('button');
+        remove.className = 'remove';
+        remove.type = 'button';
+        remove.textContent = '×';
+        remove.addEventListener('click', (e) => { e.stopPropagation(); onRemove(); });
+        el.appendChild(remove);
+      }
+    }
+
+    function renderInventory() {
+      invGrid.innerHTML = '';
+      if (!inventory.length) {
+        invGrid.innerHTML = '<div class="inv-empty">Пусто. Выиграй что-нибудь 🎁</div>';
+      } else {
+        inventory.forEach(inv => invGrid.appendChild(buildItemCard(inv, () => openModal(inv))));
+      }
+      sellAllBtn.disabled = !inventory.length || spinning;
+    }
+
+    const modal = document.getElementById('modal');
+    const modalPreview = document.getElementById('modalPreview');
+    const modalImg = document.getElementById('modalImg');
+    const modalName = document.getElementById('modalName');
+    const modalPrice = document.getElementById('modalPrice');
+    const modalPayout = document.getElementById('modalPayout');
+    const modalUse = document.getElementById('modalUse');
+    const modalSell = document.getElementById('modalSell');
+    const modalCancel = document.getElementById('modalCancel');
+    let modalInvId = null;
+
+    function openModal(inv) {
+      modalInvId = inv.id;
+      modalPreview.style.setProperty('--rarity', RARITY_COLORS[inv.rarity] || RARITY_COLORS.common);
+      modalImg.src = inv.img;
+      modalName.innerHTML = `<b>${inv.type || ''}</b> · ${inv.name || ''}`;
+      modalPrice.textContent = fmtPrice(inv.price);
+      modalPayout.textContent = fmtPrice(inv.price * SELL_RATE);
+      modalUse.disabled = !!myItem || spinning;
+      modalSell.disabled = spinning;
+      modal.classList.add('open');
+    }
+    function closeModal() { modal.classList.remove('open'); modalInvId = null; }
+    modalCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+    modalUse.addEventListener('click', () => {
+      if (myItem || spinning) return;
+      const inv = inventory.find(i => i.id === modalInvId);
+      if (!inv) return;
+      myItem = { ...inv, paid: 0 };
+      inventory = inventory.filter(i => i.id !== modalInvId);
+      closeModal(); renderInventory(); renderZones(); renderShop(); saveState();
+      setResult(`В слоте: ${myItem.name}`, 'deposit');
+    });
+    modalSell.addEventListener('click', () => {
+      if (spinning) return;
+      const inv = inventory.find(i => i.id === modalInvId);
+      if (!inv) return;
+      const payout = inv.price * SELL_RATE;
+      addBalance(payout);
+      inventory = inventory.filter(i => i.id !== modalInvId);
+      closeModal(); renderInventory(); renderShop(); saveState();
+      setResult(`Продано ${inv.name} за ${fmtPrice(payout)}`, 'deposit');
+    });
+    sellAllBtn.addEventListener('click', () => {
+      if (spinning || !inventory.length) return;
+      let total = 0;
+      inventory.forEach(inv => { total += inv.price * SELL_RATE; });
+      addBalance(total);
+      const count = inventory.length;
+      inventory = [];
+      renderInventory(); renderShop(); saveState();
+      setResult(`Продано ${count} шт. за ${fmtPrice(total)}`, 'deposit');
+    });
+
+    const pointer = document.getElementById('pointer');
+    const spinBtn = document.getElementById('spin');
+    const sector = document.getElementById('sector');
+    const resultEl = document.getElementById('result');
+    const C = 2 * Math.PI * 81;
+    let rotation = 0, timer = null;
+
+    function setChance(chance) {
+      const active = chance / 100 * C;
+      const rest = C - active;
+      const offset = active / 2 - C / 4;
+      sector.setAttribute('stroke-dasharray', `${active} ${rest}`);
+      sector.setAttribute('stroke-dashoffset', offset);
+    }
+    function setResult(text, cls) {
+      resultEl.textContent = text;
+      resultEl.className = 'result ' + cls;
+    }
+
+    function calcChance() {
+      if (!myItem || !wantItem) return 0;
+      const my = Math.max(0.01, myItem.price);
+      const target = Math.max(0.01, wantItem.price);
+      return Math.min(MAX_CHANCE, my / (my + target) * 100);
+    }
+    function levelText(chance) {
+      if (chance >= 60) return 'высокий шанс';
+      if (chance >= 25) return 'средний шанс';
+      return 'низкий шанс';
+    }
+    function levelClass(chance) {
+      if (chance >= 60) return 'high';
+      if (chance >= 25) return 'mid';
+      return 'low';
+    }
+
+    function updateChancePreview() {
+      if (spinning) return;
+      if (myItem && wantItem) {
+        const ch = calcChance();
+        setChance(ch);
+        percEl.textContent = ch.toFixed(2) + '%';
+        levelEl.textContent = levelText(ch);
+        spinBtn.classList.remove('idle', 'low', 'mid', 'high');
+        spinBtn.classList.add(levelClass(ch));
+      } else {
+        setChance(0);
+        percEl.textContent = '??%';
+        levelEl.textContent = 'заполни слоты';
+        spinBtn.classList.remove('low', 'mid', 'high');
+        spinBtn.classList.add('idle');
+      }
+    }
+
+    spinBtn.addEventListener('click', () => {
+      if (spinning) return;
+      if (!myItem || !wantItem) { setResult('Заполни оба слота', 'fail'); return; }
+
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+      spinning = true;
+      spinBtn.disabled = true;
+      clearTimeout(timer);
+      currentChance = calcChance();
+      setResult('Крутится...', 'process');
+
+      const chance = currentChance;
+      const roll = +(Math.random() * 100).toFixed(2);
+      const success = roll <= chance;
+
+      setChance(chance);
+
+      const sectorDeg = chance / 100 * 360;
+      const start = 180 - sectorDeg / 2;
+      const end = 180 + sectorDeg / 2;
+      let target;
+      if (success) target = start + Math.random() * sectorDeg;
+      else { const gray = 360 - sectorDeg; target = (end + Math.random() * gray) % 360; }
+
+      const mod = ((rotation % 360) + 360) % 360;
+      const forward = (((target - mod) % 360) + 360) % 360;
+      const spins = (7 + Math.floor(Math.random() * 4)) * 360;
+      rotation += spins + forward;
+
+      scheduleTicks(SPIN_DURATION_MS);
+
+      pointer.style.transition = 'transform ' + (SPIN_DURATION_MS / 1000) + 's cubic-bezier(.05, .6, .05, 1)';
+      void pointer.offsetWidth;
+      pointer.style.transform = `rotate(${rotation}deg)`;
+
+      timer = setTimeout(() => {
+        pointer.style.transition = '';
+        if (success) {
+          const won = { ...wantItem, id: ++invIdSeq, paid: 0 };
+          inventory.push(won);
+          setResult(`УСПЕХ! ${won.name} → в инвентарь`, 'success');
+        } else {
+          setResult('НЕУДАЧА. Всё сгорело', 'fail');
+        }
+        myItem = null; wantItem = null; currentChance = 0;
+        renderZones(); renderShop(); renderInventory(); saveState();
+        spinning = false; spinBtn.disabled = false;
+      }, SPIN_DURATION_MS);
+    });
+
+    const loaded = loadState();
+    setBalance(loaded ? balance : START_BALANCE);
+    renderZones(); renderShop(); renderInventory();
+  </script>
+</body>
+  </html>
